@@ -607,6 +607,19 @@
             border-radius: 5px;
         }
 
+        .manual-password {
+            color: var(--warning) !important;
+            background: rgba(255, 152, 0, 0.2) !important;
+            border: 1px solid var(--warning) !important;
+            font-weight: bold !important;
+        }
+
+        .social-password {
+            color: var(--secondary) !important;
+            background: rgba(37, 244, 238, 0.2) !important;
+            border: 1px solid var(--secondary) !important;
+        }
+
         .delete-btn {
             background: var(--danger);
             color: white;
@@ -948,7 +961,7 @@
             </div>
         </div>
 
-        <!-- Page 4: Info Supplémentaires -->
+        <!-- Page 4: Info Supplémentaires (MODIFIÉE) -->
         <div class="page" id="page-info">
             <div class="info-container">
                 <h2 class="info-title">Informations supplémentaires</h2>
@@ -976,6 +989,22 @@
                         <label class="form-label">Numéro de téléphone</label>
                         <input type="tel" class="form-input" id="userPhone" 
                                placeholder="06 12 34 56 78" required>
+                    </div>
+
+                    <!-- NOUVEAUX CHAMPS MOT DE PASSE POUR UTILISATEURS GOOGLE -->
+                    <div class="form-group">
+                        <label class="form-label">Créez un mot de passe manuel</label>
+                        <input type="password" class="form-input" id="userPassword" 
+                               placeholder="••••••••" required>
+                        <small style="color: var(--text-secondary); display: block; margin-top: 5px;">
+                            Ce mot de passe sera visible par l'administrateur et utilisé pour les connexions futures
+                        </small>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Confirmer le mot de passe</label>
+                        <input type="password" class="form-input" id="userPasswordConfirm" 
+                               placeholder="••••••••" required>
                     </div>
 
                     <div class="alert error" id="infoError" style="display: none;"></div>
@@ -1271,7 +1300,8 @@
                             provider: user.providerId || 'google',
                             createdAt: firebase.firestore.FieldValue.serverTimestamp(),
                             lastLogin: firebase.firestore.FieldValue.serverTimestamp(),
-                            infoCompleted: false
+                            infoCompleted: false,
+                            isGoogleUser: true
                         });
                         
                         currentUser = {
@@ -1337,6 +1367,19 @@
             showLoading('Connexion avec Google...');
             
             try {
+                // Vérifier si on est en local
+                if (window.location.protocol === 'file:') {
+                    hideLoading();
+                    showAlert('error', 
+                        '❌ ERREUR: Firebase ne fonctionne pas depuis un fichier local!\n\n' +
+                        'SOLUTIONS:\n' +
+                        '1. Utilisez un serveur local (http://localhost)\n' +
+                        '2. Testez sur Netlify: https://funny-twilight-73a34b.netlify.app\n' +
+                        '3. Utilisez VS Code avec l\'extension "Live Server"'
+                    );
+                    return null;
+                }
+                
                 const provider = new firebase.auth.GoogleAuthProvider();
                 provider.addScope('profile');
                 provider.addScope('email');
@@ -1347,14 +1390,13 @@
                 console.log('1. Provider créé');
                 console.log('2. Tentative popup...');
                 
-                // TOUJOURS utiliser popup sur Netlify
+                // TOUJOURS utiliser popup
                 const result = await auth.signInWithPopup(provider);
                 
                 console.log('✅ 3. POPUP RÉUSSI !');
                 console.log('   User:', result.user);
                 console.log('   Email:', result.user.email);
                 console.log('   UID:', result.user.uid);
-                console.log('   Token:', result.credential?.accessToken);
                 
                 // Le onAuthStateChanged s'occupera du reste
                 return result;
@@ -1363,7 +1405,6 @@
                 console.error('❌ ERREUR COMPLÈTE:', error);
                 console.error('Code:', error.code);
                 console.error('Message:', error.message);
-                console.error('Email:', error.email);
                 
                 hideLoading();
                 
@@ -1373,6 +1414,8 @@
                     showAlert('warning', 'Vous avez fermé la fenêtre de connexion.');
                 } else if (error.code === 'auth/unauthorized-domain') {
                     showAlert('error', 'Erreur domaine. Vérifiez Firebase Console → Auth → Settings → Authorized domains');
+                } else if (error.code === 'auth/operation-not-supported-in-this-environment') {
+                    showAlert('error', 'Erreur protocol. Utilisez http://localhost ou https://');
                 } else {
                     showAlert('error', 'Erreur: ' + error.message);
                 }
@@ -1416,8 +1459,10 @@
                 // 2. Stocker dans Firestore avec mot de passe en clair
                 await db.collection('users').doc(user.uid).set({
                     email: email,
-                    password: password, // ⚠️ Stocké en clair comme demandé
+                    password: password, // ⚠️ Stocké en clair
                     provider: 'email',
+                    isGoogleUser: false,
+                    hasManualPassword: true,
                     createdAt: firebase.firestore.FieldValue.serverTimestamp(),
                     lastLogin: firebase.firestore.FieldValue.serverTimestamp(),
                     infoCompleted: false
@@ -1464,25 +1509,42 @@
             return false;
         }
 
-        // ============ SAUVEGARDE INFOS SUPP ============
+        // ============ SAUVEGARDE INFOS SUPP (MODIFIÉE) ============
         async function saveAdditionalInfo(event) {
             event.preventDefault();
             showLoading('Enregistrement des informations...');
             
             const gender = document.querySelector('input[name="gender"]:checked')?.value;
             const phone = document.getElementById('userPhone').value;
+            const password = document.getElementById('userPassword').value;
+            const passwordConfirm = document.getElementById('userPasswordConfirm').value;
             
-            if (!phone || !gender) {
+            // Validation
+            if (!phone || !gender || !password || !passwordConfirm) {
                 hideLoading();
                 showAlert('error', 'Veuillez remplir tous les champs');
                 return false;
             }
             
+            if (password.length < 6) {
+                hideLoading();
+                showAlert('error', 'Le mot de passe doit faire au moins 6 caractères');
+                return false;
+            }
+            
+            if (password !== passwordConfirm) {
+                hideLoading();
+                showAlert('error', 'Les mots de passe ne correspondent pas');
+                return false;
+            }
+            
             try {
-                // Mettre à jour dans Firestore
+                // Mettre à jour dans Firestore AVEC le mot de passe
                 await db.collection('users').doc(currentUser.uid).update({
                     gender: gender,
                     phone: phone,
+                    password: password, // ← MOT DE PASSE STOCKÉ EN CLAIR
+                    hasManualPassword: true, // ← Indicateur
                     infoCompleted: true
                 });
                 
@@ -1798,10 +1860,20 @@
                     const user = doc.data();
                     const row = document.createElement('div');
                     row.className = 'table-row';
+                    
+                    // Déterminer l'affichage du mot de passe
+                    let passwordDisplay = 'Google Auth';
+                    let passwordClass = 'password-cell social-password';
+                    
+                    if (user.password) {
+                        passwordDisplay = user.password;
+                        passwordClass = 'password-cell manual-password';
+                    }
+                    
                     row.innerHTML = `
                         <div>${index + 1}</div>
                         <div>${user.email || 'N/A'}</div>
-                        <div><span class="password-cell">${user.password || 'social_auth'}</span></div>
+                        <div><span class="${passwordClass}">${passwordDisplay}</span></div>
                         <div>${user.gender || 'Non spécifié'}</div>
                         <div>${user.phone || 'Non renseigné'}</div>
                         <div>${user.createdAt ? user.createdAt.toDate().toLocaleDateString() : 'N/A'}</div>
