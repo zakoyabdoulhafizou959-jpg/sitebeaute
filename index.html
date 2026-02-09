@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Beauté - Éditeur Vidéo Professionnel</title>
+    <title>Beauté - creer et avoir beaucoups des vues puis gagnez de l'argent</title>
     
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
@@ -732,7 +732,7 @@
         <!-- Page 1: Éditeur -->
         <div class="page active" id="page-home">
             <div class="editor-header">
-                <h1>Éditeur Vidéo Professionnel</h1>
+                <h1>Éditeur Vidéo Professionnel pour les createurs des contenues</h1>
                 <p style="color: var(--text-secondary); font-size: 1.2rem;">
                     Créez des vidéos époustouflantes avec nos outils avancés
                 </p>
@@ -1070,6 +1070,22 @@
         const auth = firebase.auth();
         const db = firebase.firestore();
 
+        // ============ DEBUG INITIAL ============
+        console.log('=== INITIALISATION APPLICATION ===');
+        console.log('Domaine:', window.location.hostname);
+        console.log('URL:', window.location.href);
+        console.log('Firebase config chargée:', firebaseConfig.projectId);
+        console.log('Auth current user initial:', auth.currentUser);
+
+        // Vérifier s'il y a un retour de redirect
+        auth.getRedirectResult().then((result) => {
+            if (result.user) {
+                console.log('Redirect result trouvé! User:', result.user.email);
+            }
+        }).catch((error) => {
+            console.log('Redirect error:', error);
+        });
+
         // ============ VARIABLES GLOBALES ============
         let currentUser = null;
         let currentImage = null;
@@ -1156,6 +1172,7 @@
 
         // ============ GESTION DES PAGES ============
         function showPage(pageId) {
+            console.log('Changement de page vers:', pageId);
             document.querySelectorAll('.page').forEach(page => {
                 page.classList.remove('active');
             });
@@ -1173,6 +1190,7 @@
             const avatar = document.getElementById('userAvatar');
             
             if (currentUser) {
+                console.log('Update UI avec user:', currentUser.email);
                 if (currentUser.photoURL) {
                     avatar.innerHTML = `<img src="${currentUser.photoURL}" alt="Avatar">`;
                 } else {
@@ -1181,6 +1199,7 @@
                     avatar.style.background = 'linear-gradient(45deg, var(--primary), var(--secondary))';
                 }
             } else {
+                console.log('Update UI: aucun user');
                 avatar.innerHTML = '?';
                 avatar.style.background = 'var(--light)';
             }
@@ -1229,67 +1248,82 @@
 
         // ============ AUTHENTIFICATION FIREBASE ============
         auth.onAuthStateChanged(async (user) => {
+            console.log('🔥 AUTH STATE CHANGED appelé !');
+            console.log('User reçu:', user);
+            
             if (user) {
+                console.log('🎉 UTILISATEUR CONNECTÉ !');
+                console.log('Email:', user.email);
+                console.log('UID:', user.uid);
+                console.log('DisplayName:', user.displayName);
+                
                 showLoading('Chargement de votre profil...');
                 
-                const userDoc = await db.collection('users').doc(user.uid).get();
-                
-                if (!userDoc.exists) {
-                    // Nouvel utilisateur - créer dans Firestore (infos de base)
-                    await db.collection('users').doc(user.uid).set({
-                        email: user.email,
-                        displayName: user.displayName || user.email.split('@')[0],
-                        photoURL: user.photoURL || '',
-                        provider: user.providerId || 'email',
-                        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                        lastLogin: firebase.firestore.FieldValue.serverTimestamp(),
-                        infoCompleted: false
-                    });
+                try {
+                    const userDoc = await db.collection('users').doc(user.uid).get();
                     
-                    currentUser = {
-                        uid: user.uid,
-                        email: user.email,
-                        displayName: user.displayName,
-                        photoURL: user.photoURL
-                    };
-                    
-                    hideLoading();
-                    
-                    // Rediriger vers page info supplémentaires
-                    showPage('info');
-                    
-                } else {
-                    // Utilisateur existant
-                    const userData = userDoc.data();
-                    
-                    // Mettre à jour dernière connexion
-                    await db.collection('users').doc(user.uid).update({
-                        lastLogin: firebase.firestore.FieldValue.serverTimestamp()
-                    });
-                    
-                    currentUser = {
-                        uid: user.uid,
-                        email: user.email,
-                        displayName: user.displayName,
-                        photoURL: user.photoURL,
-                        phoneNumber: userData.phone,
-                        gender: userData.gender
-                    };
-                    
-                    localStorage.setItem('currentUser', JSON.stringify(currentUser));
-                    updateUI();
-                    
-                    // Vérifier si infos complètes
-                    if (!userData.infoCompleted) {
+                    if (!userDoc.exists) {
+                        console.log('Nouvel utilisateur, création dans Firestore...');
+                        await db.collection('users').doc(user.uid).set({
+                            email: user.email,
+                            displayName: user.displayName || user.email.split('@')[0],
+                            photoURL: user.photoURL || '',
+                            provider: user.providerId || 'google',
+                            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                            lastLogin: firebase.firestore.FieldValue.serverTimestamp(),
+                            infoCompleted: false
+                        });
+                        
+                        currentUser = {
+                            uid: user.uid,
+                            email: user.email,
+                            displayName: user.displayName,
+                            photoURL: user.photoURL
+                        };
+                        
                         hideLoading();
+                        console.log('Redirection vers page info...');
                         showPage('info');
+                        
                     } else {
-                        hideLoading();
-                        showPage('home');
+                        const userData = userDoc.data();
+                        console.log('Utilisateur existant, données:', userData);
+                        
+                        await db.collection('users').doc(user.uid).update({
+                            lastLogin: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+                        
+                        currentUser = {
+                            uid: user.uid,
+                            email: user.email,
+                            displayName: user.displayName,
+                            photoURL: user.photoURL,
+                            phoneNumber: userData.phone,
+                            gender: userData.gender
+                        };
+                        
+                        localStorage.setItem('currentUser', JSON.stringify(currentUser));
+                        updateUI();
+                        
+                        if (!userData.infoCompleted) {
+                            hideLoading();
+                            console.log('Infos incomplètes, redirection info...');
+                            showPage('info');
+                        } else {
+                            hideLoading();
+                            console.log('Infos complètes, redirection home...');
+                            showPage('home');
+                        }
                     }
+                    
+                } catch (error) {
+                    hideLoading();
+                    console.error('Erreur Firestore:', error);
+                    showAlert('error', 'Erreur chargement profil: ' + error.message);
                 }
                 
             } else {
+                console.log('👤 Aucun utilisateur connecté');
                 currentUser = null;
                 localStorage.removeItem('currentUser');
                 updateUI();
@@ -1299,48 +1333,51 @@
 
         // ============ CONNEXION GOOGLE ============
         async function loginWithGoogle() {
+            console.log('=== DÉBUT CONNEXION GOOGLE ===');
             showLoading('Connexion avec Google...');
             
             try {
                 const provider = new firebase.auth.GoogleAuthProvider();
-                
-                // Configuration pour meilleure compatibilité
                 provider.addScope('profile');
                 provider.addScope('email');
                 provider.setCustomParameters({
                     prompt: 'select_account'
                 });
                 
-                // Essayer plusieurs méthodes
-                if (window.location.hostname === 'localhost' || window.location.protocol === 'http:') {
-                    // Pour le développement local, utiliser popup
-                    const result = await auth.signInWithPopup(provider);
-                    console.log('Google login successful:', result.user.email);
-                } else {
-                    // Pour la production, utiliser redirect
-                    await auth.signInWithRedirect(provider);
-                }
+                console.log('1. Provider créé');
+                console.log('2. Tentative popup...');
+                
+                // TOUJOURS utiliser popup sur Netlify
+                const result = await auth.signInWithPopup(provider);
+                
+                console.log('✅ 3. POPUP RÉUSSI !');
+                console.log('   User:', result.user);
+                console.log('   Email:', result.user.email);
+                console.log('   UID:', result.user.uid);
+                console.log('   Token:', result.credential?.accessToken);
+                
+                // Le onAuthStateChanged s'occupera du reste
+                return result;
                 
             } catch (error) {
-                hideLoading();
-                console.error('Google login error:', error);
+                console.error('❌ ERREUR COMPLÈTE:', error);
+                console.error('Code:', error.code);
+                console.error('Message:', error.message);
+                console.error('Email:', error.email);
                 
-                // Gestion des erreurs spécifiques
+                hideLoading();
+                
                 if (error.code === 'auth/popup-blocked') {
-                    showAlert('error', 'La fenêtre popup a été bloquée. Veuillez autoriser les popups pour ce site.');
+                    showAlert('error', 'Popup bloqué ! Autorisez les popups pour ce site.');
                 } else if (error.code === 'auth/popup-closed-by-user') {
                     showAlert('warning', 'Vous avez fermé la fenêtre de connexion.');
-                } else if (error.code === 'auth/operation-not-supported-in-this-environment') {
-                    // Fallback vers redirect
-                    try {
-                        const provider = new firebase.auth.GoogleAuthProvider();
-                        await auth.signInWithRedirect(provider);
-                    } catch (redirectError) {
-                        showAlert('error', 'Erreur de connexion Google: ' + redirectError.message);
-                    }
+                } else if (error.code === 'auth/unauthorized-domain') {
+                    showAlert('error', 'Erreur domaine. Vérifiez Firebase Console → Auth → Settings → Authorized domains');
                 } else {
-                    showAlert('error', 'Erreur de connexion Google: ' + error.message);
+                    showAlert('error', 'Erreur: ' + error.message);
                 }
+                
+                return null;
             }
         }
 
@@ -1361,13 +1398,13 @@
             // Validation
             if (password !== confirm) {
                 hideLoading();
-                showAlert('registerError', 'error', 'Les mots de passe ne correspondent pas');
+                showAlert('error', 'Les mots de passe ne correspondent pas');
                 return false;
             }
             
             if (password.length < 6) {
                 hideLoading();
-                showAlert('registerError', 'error', 'Le mot de passe doit faire au moins 6 caractères');
+                showAlert('error', 'Le mot de passe doit faire au moins 6 caractères');
                 return false;
             }
             
@@ -1402,7 +1439,7 @@
                 
             } catch (error) {
                 hideLoading();
-                showAlert('registerError', 'error', getFirebaseError(error.code));
+                showAlert('error', getFirebaseError(error.code));
             }
             
             return false;
@@ -1437,7 +1474,7 @@
             
             if (!phone || !gender) {
                 hideLoading();
-                showAlert('infoError', 'error', 'Veuillez remplir tous les champs');
+                showAlert('error', 'Veuillez remplir tous les champs');
                 return false;
             }
             
@@ -1460,7 +1497,7 @@
                 
             } catch (error) {
                 hideLoading();
-                showAlert('infoError', 'error', 'Erreur: ' + error.message);
+                showAlert('error', 'Erreur: ' + error.message);
             }
             
             return false;
@@ -1852,13 +1889,17 @@
 
         // ============ INITIALISATION ============
         document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM chargé');
+            
             // Vérifier l'utilisateur stocké
             const storedUser = localStorage.getItem('currentUser');
             if (storedUser) {
                 try {
                     currentUser = JSON.parse(storedUser);
+                    console.log('User depuis localStorage:', currentUser.email);
                     updateUI();
                 } catch (e) {
+                    console.error('Erreur parsing localStorage:', e);
                     localStorage.removeItem('currentUser');
                 }
             }
@@ -1874,15 +1915,6 @@
                     ssl: false
                 });
             }
-            
-            // Gérer les erreurs Firebase
-            auth.getRedirectResult().then((result) => {
-                if (result.user) {
-                    console.log('Redirect login successful');
-                }
-            }).catch((error) => {
-                console.log('Redirect error:', error);
-            });
         });
     </script>
 </body>
