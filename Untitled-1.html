@@ -1,0 +1,1889 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Beauté - Éditeur Vidéo Professionnel</title>
+    
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+    
+    <style>
+        :root {
+            --primary: #ff2d95;
+            --secondary: #25F4EE;
+            --facebook: #1877f2;
+            --whatsapp: #25D366;
+            --success: #4CAF50;
+            --warning: #FF9800;
+            --danger: #F44336;
+            --dark: #121212;
+            --darker: #0a0a0a;
+            --light: #2a2a2a;
+            --text: #ffffff;
+            --text-secondary: #b0b0b0;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--darker);
+            color: var(--text);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Navigation */
+        .nav-bar {
+            background: rgba(18, 18, 18, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 15px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: fixed;
+            width: 100%;
+            top: 0;
+            z-index: 1000;
+            border-bottom: 1px solid var(--light);
+        }
+
+        .logo {
+            font-size: 1.8rem;
+            font-weight: 800;
+            background: linear-gradient(45deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: 1px;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+
+        .nav-btn {
+            background: transparent;
+            border: 1px solid var(--primary);
+            color: var(--primary);
+            padding: 8px 20px;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 500;
+        }
+
+        .nav-btn:hover {
+            background: var(--primary);
+            color: white;
+            transform: translateY(-2px);
+        }
+
+        .admin-btn {
+            background: var(--danger);
+            color: white;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .user-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: linear-gradient(45deg, var(--primary), var(--secondary));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            border: 2px solid white;
+            overflow: hidden;
+        }
+
+        .user-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        /* Pages Container */
+        .pages-container {
+            margin-top: 80px;
+            min-height: calc(100vh - 80px);
+        }
+
+        .page {
+            display: none;
+            padding: 20px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .page.active {
+            display: block;
+        }
+
+        /* Page d'accueil (Éditeur) */
+        .editor-header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding: 20px;
+        }
+
+        .editor-header h1 {
+            font-size: 3rem;
+            margin-bottom: 10px;
+            background: linear-gradient(45deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        /* Éditeur principal */
+        .editor-main {
+            display: grid;
+            grid-template-columns: 1fr 350px;
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        @media (max-width: 1024px) {
+            .editor-main {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Canvas d'édition */
+        .canvas-container {
+            background: black;
+            border-radius: 20px;
+            overflow: hidden;
+            position: relative;
+            height: 600px;
+            border: 3px solid var(--light);
+        }
+
+        #editorCanvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        .canvas-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            pointer-events: none;
+            background: transparent;
+        }
+
+        /* Contrôles canvas */
+        .canvas-controls {
+            position: absolute;
+            bottom: 20px;
+            left: 0;
+            right: 0;
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            z-index: 10;
+        }
+
+        .canvas-btn {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: rgba(0, 0, 0, 0.7);
+            border: 2px solid var(--primary);
+            color: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            transition: all 0.3s ease;
+        }
+
+        .canvas-btn:hover {
+            background: var(--primary);
+            transform: scale(1.1);
+        }
+
+        /* Panneau d'outils */
+        .tools-panel {
+            background: var(--dark);
+            border-radius: 20px;
+            padding: 20px;
+            border: 2px solid var(--light);
+            height: 600px;
+            overflow-y: auto;
+        }
+
+        .tool-section {
+            margin-bottom: 30px;
+        }
+
+        .tool-title {
+            font-size: 1.1rem;
+            margin-bottom: 15px;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        /* Boutons d'import */
+        .import-buttons {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .import-btn {
+            padding: 12px;
+            background: var(--light);
+            border: none;
+            border-radius: 10px;
+            color: var(--text);
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .import-btn:hover {
+            background: var(--primary);
+            transform: translateY(-2px);
+        }
+
+        /* Filtres */
+        .filters-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }
+
+        .filter-btn {
+            padding: 10px;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid var(--light);
+            border-radius: 8px;
+            color: var(--text);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 0.9rem;
+            text-align: center;
+        }
+
+        .filter-btn:hover {
+            border-color: var(--primary);
+            background: rgba(255,45,149,0.1);
+        }
+
+        .filter-btn.active {
+            border-color: var(--primary);
+            background: rgba(255,45,149,0.2);
+            color: var(--primary);
+        }
+
+        /* Effets */
+        .effects-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+
+        .effect-btn {
+            padding: 12px;
+            background: rgba(37, 244, 238, 0.1);
+            border: 1px solid var(--secondary);
+            border-radius: 10px;
+            color: var(--text);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: center;
+        }
+
+        .effect-btn:hover {
+            background: rgba(37, 244, 238, 0.2);
+            transform: translateY(-2px);
+        }
+
+        .effect-btn.active {
+            background: var(--secondary);
+            color: black;
+            font-weight: bold;
+        }
+
+        /* Sliders */
+        .slider-container {
+            margin: 15px 0;
+        }
+
+        .slider-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            color: var(--text-secondary);
+        }
+
+        .slider {
+            width: 100%;
+            height: 6px;
+            -webkit-appearance: none;
+            background: var(--light);
+            border-radius: 3px;
+            outline: none;
+        }
+
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: var(--primary);
+            cursor: pointer;
+        }
+
+        /* Export */
+        .export-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .export-btn {
+            padding: 15px;
+            border: none;
+            border-radius: 10px;
+            background: linear-gradient(45deg, var(--primary), var(--secondary));
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            transition: all 0.3s ease;
+        }
+
+        .export-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(255,45,149,0.3);
+        }
+
+        /* Page de Login */
+        .login-container {
+            max-width: 500px;
+            margin: 0 auto;
+            padding: 40px;
+            background: var(--dark);
+            border-radius: 25px;
+            border: 2px solid var(--light);
+            margin-top: 50px;
+        }
+
+        .login-title {
+            text-align: center;
+            margin-bottom: 30px;
+            color: var(--primary);
+            font-size: 2rem;
+        }
+
+        .social-login {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            margin: 30px 0;
+        }
+
+        .social-btn {
+            padding: 15px;
+            border: none;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            transition: all 0.3s ease;
+        }
+
+        .social-btn.google {
+            background: white;
+            color: #333;
+            border: 2px solid #ddd;
+        }
+
+        .social-btn.google:hover {
+            background: #f0f0f0;
+            transform: translateY(-3px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+        }
+
+        .social-btn.facebook {
+            background: var(--facebook);
+            color: white;
+        }
+
+        .social-btn.facebook:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 20px rgba(24, 119, 242, 0.3);
+        }
+
+        .divider {
+            text-align: center;
+            margin: 30px 0;
+            position: relative;
+            color: var(--text-secondary);
+        }
+
+        .divider::before {
+            content: "";
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: var(--light);
+        }
+
+        .divider span {
+            background: var(--dark);
+            padding: 0 20px;
+            position: relative;
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 10px;
+            color: var(--text);
+            font-weight: 500;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 15px;
+            background: rgba(255,255,255,0.1);
+            border: 2px solid var(--light);
+            border-radius: 12px;
+            color: var(--text);
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(255,45,149,0.1);
+        }
+
+        .submit-btn {
+            width: 100%;
+            padding: 16px;
+            background: linear-gradient(45deg, var(--primary), var(--secondary));
+            border: none;
+            border-radius: 12px;
+            color: white;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 20px;
+        }
+
+        .submit-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(255,45,149,0.3);
+        }
+
+        .form-link {
+            text-align: center;
+            margin-top: 25px;
+            color: var(--text-secondary);
+        }
+
+        .form-link a {
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        /* Page Info Supplémentaires */
+        .info-container {
+            max-width: 500px;
+            margin: 0 auto;
+            padding: 40px;
+            background: var(--dark);
+            border-radius: 25px;
+            border: 2px solid var(--primary);
+            margin-top: 50px;
+        }
+
+        .info-title {
+            text-align: center;
+            margin-bottom: 30px;
+            color: var(--primary);
+            font-size: 1.8rem;
+        }
+
+        /* Page Admin */
+        .admin-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 30px;
+        }
+
+        .admin-title {
+            color: var(--danger);
+            margin-bottom: 30px;
+            font-size: 2rem;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .users-table {
+            width: 100%;
+            background: var(--dark);
+            border-radius: 15px;
+            overflow: hidden;
+            border: 1px solid var(--light);
+        }
+
+        .table-header {
+            display: grid;
+            grid-template-columns: 50px 1fr 1fr 1fr 1fr 150px 100px;
+            background: var(--primary);
+            color: white;
+            font-weight: bold;
+            padding: 20px;
+        }
+
+        .table-row {
+            display: grid;
+            grid-template-columns: 50px 1fr 1fr 1fr 1fr 150px 100px;
+            padding: 20px;
+            border-bottom: 1px solid var(--light);
+            align-items: center;
+        }
+
+        .table-row:nth-child(even) {
+            background: rgba(255,255,255,0.05);
+        }
+
+        .password-cell {
+            font-family: monospace;
+            color: var(--success);
+            font-weight: bold;
+            background: rgba(0,0,0,0.3);
+            padding: 5px 10px;
+            border-radius: 5px;
+        }
+
+        .delete-btn {
+            background: var(--danger);
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+
+        /* Messages */
+        .alert {
+            padding: 15px 20px;
+            border-radius: 12px;
+            margin: 20px 0;
+            display: none;
+        }
+
+        .alert.success {
+            background: rgba(76, 175, 80, 0.2);
+            border: 1px solid var(--success);
+            color: var(--success);
+        }
+
+        .alert.error {
+            background: rgba(244, 67, 54, 0.2);
+            border: 1px solid var(--danger);
+            color: var(--danger);
+        }
+
+        .alert.warning {
+            background: rgba(255, 152, 0, 0.2);
+            border: 1px solid var(--warning);
+            color: var(--warning);
+        }
+
+        .alert.info {
+            background: rgba(37, 150, 190, 0.2);
+            border: 1px solid #2596be;
+            color: #2596be;
+        }
+
+        /* Loading */
+        .loading {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.8);
+            z-index: 3000;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+        }
+
+        .spinner {
+            width: 60px;
+            height: 60px;
+            border: 5px solid rgba(255,255,255,0.1);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .nav-bar {
+                padding: 15px;
+                flex-direction: column;
+                gap: 15px;
+            }
+            
+            .editor-main {
+                grid-template-columns: 1fr;
+            }
+            
+            .canvas-container {
+                height: 400px;
+            }
+            
+            .table-header, .table-row {
+                grid-template-columns: 1fr;
+                display: block;
+                padding: 15px;
+            }
+            
+            .import-buttons {
+                grid-template-columns: 1fr;
+            }
+            
+            .filters-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <div class="nav-bar">
+        <div class="logo">BEAUTÉ PRO</div>
+        <div class="nav-links">
+            <button class="nav-btn" onclick="showPage('home')">
+                🏠 Accueil
+            </button>
+            <button class="admin-btn" onclick="showPage('admin')">
+                🔐 Admin
+            </button>
+            <div class="user-avatar" id="userAvatar" onclick="toggleUserMenu()">
+                ?
+            </div>
+        </div>
+    </div>
+
+    <!-- Pages Container -->
+    <div class="pages-container">
+        <!-- Page 1: Éditeur -->
+        <div class="page active" id="page-home">
+            <div class="editor-header">
+                <h1>Éditeur Vidéo Professionnel</h1>
+                <p style="color: var(--text-secondary); font-size: 1.2rem;">
+                    Créez des vidéos époustouflantes avec nos outils avancés
+                </p>
+                <p style="color: var(--warning); margin-top: 20px; font-style: italic;">
+                    🔒 Connectez-vous pour débloquer toutes les fonctionnalités
+                </p>
+            </div>
+
+            <div class="editor-main">
+                <!-- Canvas d'édition -->
+                <div class="canvas-container">
+                    <canvas id="editorCanvas"></canvas>
+                    <div class="canvas-overlay"></div>
+                    
+                    <div class="canvas-controls">
+                        <button class="canvas-btn" onclick="requireAuth('zoomIn')" title="Zoom +">
+                            🔍
+                        </button>
+                        <button class="canvas-btn" onclick="requireAuth('zoomOut')" title="Zoom -">
+                            🔎
+                        </button>
+                        <button class="canvas-btn" onclick="requireAuth('rotateImage')" title="Rotation">
+                            🔄
+                        </button>
+                        <button class="canvas-btn" onclick="requireAuth('resetImage')" title="Réinitialiser">
+                            ↺
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Panneau d'outils -->
+                <div class="tools-panel">
+                    <!-- Import -->
+                    <div class="tool-section">
+                        <h3 class="tool-title">📁 Import média</h3>
+                        <div class="import-buttons">
+                            <button class="import-btn" onclick="importImage()">
+                                🖼️ Image
+                            </button>
+                            <button class="import-btn" onclick="importVideo()">
+                                🎬 Vidéo
+                            </button>
+                            <button class="import-btn" onclick="importAudio()">
+                                🎵 Audio
+                            </button>
+                            <button class="import-btn" onclick="addText()">
+                                ✏️ Texte
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Filtres -->
+                    <div class="tool-section">
+                        <h3 class="tool-title">🎨 Filtres</h3>
+                        <div class="filters-grid" id="filtersGrid">
+                            <button class="filter-btn" onclick="requireAuthForFilter('none')">Original</button>
+                            <button class="filter-btn" onclick="requireAuthForFilter('grayscale')">Noir & Blanc</button>
+                            <button class="filter-btn" onclick="requireAuthForFilter('sepia')">Vintage</button>
+                            <button class="filter-btn" onclick="requireAuthForFilter('contrast')">Contraste</button>
+                            <button class="filter-btn" onclick="requireAuthForFilter('brightness')">Lumière</button>
+                            <button class="filter-btn" onclick="requireAuthForFilter('saturate')">Couleurs</button>
+                            <button class="filter-btn" onclick="requireAuthForFilter('invert')">Négatif</button>
+                            <button class="filter-btn" onclick="requireAuthForFilter('hue-rotate')">Arc-en-ciel</button>
+                            <button class="filter-btn" onclick="requireAuthForFilter('blur')">Flou</button>
+                        </div>
+                        
+                        <div class="slider-container">
+                            <div class="slider-label">
+                                <span>Intensité:</span>
+                                <span id="filterIntensity">50%</span>
+                            </div>
+                            <input type="range" min="0" max="100" value="50" class="slider" 
+                                   id="filterSlider" oninput="requireAuthForSlider(this.value)">
+                        </div>
+                    </div>
+
+                    <!-- Effets -->
+                    <div class="tool-section">
+                        <h3 class="tool-title">✨ Effets TikTok</h3>
+                        <div class="effects-grid">
+                            <button class="effect-btn" onclick="requireAuthForEffect('shake')">
+                                🥴 Tremblement
+                            </button>
+                            <button class="effect-btn" onclick="requireAuthForEffect('vibrate')">
+                                📳 Vibration
+                            </button>
+                            <button class="effect-btn" onclick="requireAuthForEffect('zoom')">
+                                🔍 Zoom Pulse
+                            </button>
+                            <button class="effect-btn" onclick="requireAuthForEffect('rotate')">
+                                🌀 Rotation
+                            </button>
+                            <button class="effect-btn" onclick="requireAuthForEffect('glitch')">
+                                ⚡ Glitch
+                            </button>
+                            <button class="effect-btn" onclick="requireAuthForEffect('neon')">
+                                🌈 Neon
+                            </button>
+                        </div>
+                        
+                        <div class="slider-container">
+                            <div class="slider-label">
+                                <span>Force effet:</span>
+                                <span id="effectStrength">50%</span>
+                            </div>
+                            <input type="range" min="0" max="100" value="50" class="slider" 
+                                   id="effectSlider" oninput="requireAuthForEffectSlider(this.value)">
+                        </div>
+                    </div>
+
+                    <!-- Export -->
+                    <div class="tool-section">
+                        <h3 class="tool-title">🚀 Export</h3>
+                        <div class="export-buttons">
+                            <button class="export-btn" onclick="exportImage()">
+                                💾 Enregistrer Image
+                            </button>
+                            <button class="export-btn" onclick="exportVideo()">
+                                🎥 Exporter Vidéo
+                            </button>
+                            <button class="export-btn" onclick="shareToTikTok()">
+                                📱 Partager TikTok
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Page 2: Login -->
+        <div class="page" id="page-login">
+            <div class="login-container">
+                <h2 class="login-title">Connexion</h2>
+                
+                <div class="social-login">
+                    <button class="social-btn google" onclick="loginWithGoogle()">
+                        <span style="font-weight: bold; color: #4285F4;">G</span> 
+                        Continuer avec Google
+                    </button>
+                    <button class="social-btn facebook" onclick="loginWithFacebook()">
+                        <span style="font-weight: bold;">f</span> 
+                        Continuer avec Facebook
+                    </button>
+                </div>
+
+                <div class="divider">
+                    <span>Ou avec email</span>
+                </div>
+
+                <form id="loginForm" onsubmit="return loginWithEmail(event)">
+                    <div class="form-group">
+                        <label class="form-label">Email</label>
+                        <input type="email" class="form-input" id="loginEmail" 
+                               placeholder="votre@email.com" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Mot de passe</label>
+                        <input type="password" class="form-input" id="loginPassword" 
+                               placeholder="••••••••" required>
+                    </div>
+
+                    <button type="submit" class="submit-btn">
+                        🔐 Se connecter
+                    </button>
+                </form>
+
+                <div class="form-link">
+                    Pas de compte ? 
+                    <a href="#" onclick="showPage('register')">Inscrivez-vous ici</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Page 3: Register -->
+        <div class="page" id="page-register">
+            <div class="login-container">
+                <h2 class="login-title">Créer un compte</h2>
+                
+                <form id="registerForm" onsubmit="return registerWithEmail(event)">
+                    <div class="form-group">
+                        <label class="form-label">Email</label>
+                        <input type="email" class="form-input" id="registerEmail" 
+                               placeholder="votre@email.com" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Mot de passe</label>
+                        <input type="password" class="form-input" id="registerPassword" 
+                               placeholder="••••••••" required>
+                        <small style="color: var(--text-secondary); display: block; margin-top: 5px;">
+                            Le mot de passe sera visible par l'administrateur
+                        </small>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Confirmer le mot de passe</label>
+                        <input type="password" class="form-input" id="registerConfirm" 
+                               placeholder="••••••••" required>
+                    </div>
+
+                    <div class="alert error" id="registerError" style="display: none;"></div>
+
+                    <button type="submit" class="submit-btn">
+                        📝 S'inscrire
+                    </button>
+                </form>
+
+                <div class="form-link">
+                    Déjà un compte ? 
+                    <a href="#" onclick="showPage('login')">Connectez-vous ici</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Page 4: Info Supplémentaires -->
+        <div class="page" id="page-info">
+            <div class="info-container">
+                <h2 class="info-title">Informations supplémentaires</h2>
+                <p style="color: var(--text-secondary); margin-bottom: 30px; text-align: center;">
+                    Pour finaliser votre inscription, merci de compléter ces informations
+                </p>
+                
+                <form id="infoForm" onsubmit="return saveAdditionalInfo(event)">
+                    <div class="form-group">
+                        <label class="form-label">Sexe</label>
+                        <div style="display: flex; gap: 20px; margin-top: 10px;">
+                            <label style="display: flex; align-items: center; gap: 8px; color: var(--text);">
+                                <input type="radio" name="gender" value="male" required> Masculin
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 8px; color: var(--text);">
+                                <input type="radio" name="gender" value="female" required> Féminin
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 8px; color: var(--text);">
+                                <input type="radio" name="gender" value="other" required> Autre
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Numéro de téléphone</label>
+                        <input type="tel" class="form-input" id="userPhone" 
+                               placeholder="06 12 34 56 78" required>
+                    </div>
+
+                    <div class="alert error" id="infoError" style="display: none;"></div>
+
+                    <button type="submit" class="submit-btn">
+                        ✅ Enregistrer et continuer
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Page 5: Admin -->
+        <div class="page" id="page-admin">
+            <div class="admin-container">
+                <h2 class="admin-title">
+                    🔐 Panel Administrateur
+                </h2>
+
+                <div class="alert warning">
+                    ⚠️ Les mots de passe sont stockés en clair dans Firestore
+                </div>
+
+                <!-- Admin Login -->
+                <div id="adminLogin" style="max-width: 400px; margin: 50px auto;">
+                    <h3 style="margin-bottom: 20px;">Connexion Admin</h3>
+                    <p style="color: var(--text-secondary); margin-bottom: 20px;">
+                        Connectez-vous pour accéder au panel admin
+                    </p>
+                    <button onclick="loginAdmin()" class="social-btn google" style="width: 100%;">
+                        <span style="font-weight: bold; color: #4285F4;">G</span> 
+                        Connexion Admin avec Google
+                    </button>
+                </div>
+
+                <!-- Admin Content (caché par défaut) -->
+                <div id="adminContent" style="display: none;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+                        <h3>📊 Liste des utilisateurs</h3>
+                        <button onclick="loadUsers()" class="nav-btn">
+                            🔄 Actualiser
+                        </button>
+                    </div>
+
+                    <div class="users-table">
+                        <div class="table-header">
+                            <div>ID</div>
+                            <div>Email</div>
+                            <div>Mot de passe</div>
+                            <div>Sexe</div>
+                            <div>Téléphone</div>
+                            <div>Date d'inscription</div>
+                            <div>Actions</div>
+                        </div>
+                        <div id="usersList">
+                            <!-- Les utilisateurs seront ajoutés ici -->
+                        </div>
+                    </div>
+
+                    <div style="margin-top: 30px; text-align: center; color: var(--text-secondary);">
+                        Total: <span id="usersCount">0</span> utilisateurs
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div class="loading" id="loading">
+        <div class="spinner"></div>
+        <p id="loadingText">Chargement...</p>
+    </div>
+
+    <!-- Inputs cachés -->
+    <input type="file" id="imageInput" accept="image/*" style="display: none;">
+    <input type="file" id="videoInput" accept="video/*" style="display: none;">
+    <input type="file" id="audioInput" accept="audio/*" style="display: none;">
+
+    <script>
+        // ============ CONFIGURATION FIREBASE ============
+        const firebaseConfig = {
+            apiKey: "AIzaSyBWO3UDGvIWT3XclTeAa0djNIkXrrv5IpU",
+            authDomain: "beaute-c1e18.firebaseapp.com",
+            projectId: "beaute-c1e18",
+            storageBucket: "beaute-c1e18.firebasestorage.app",
+            messagingSenderId: "290028005340",
+            appId: "1:290028005340:web:aa9eacc2f3922357241119",
+            measurementId: "G-ZRVPT2NMVL"
+        };
+
+        // Initialiser Firebase
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        // ============ VARIABLES GLOBALES ============
+        let currentUser = null;
+        let currentImage = null;
+        let currentFilter = 'none';
+        let currentEffect = null;
+        let currentZoom = 1;
+        let currentRotation = 0;
+        let filterIntensity = 0.5;
+        let effectStrength = 0.5;
+        let isAnimating = false;
+        let animationId = null;
+        
+        const canvas = document.getElementById('editorCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        // ============ FONCTIONS D'AUTH ============
+        function requireAuth(actionName) {
+            if (!currentUser) {
+                showAlert('warning', 'Veuillez vous connecter pour utiliser cette fonctionnalité');
+                showPage('login');
+                return false;
+            }
+            
+            // Vérifier si infos complètes
+            if (!currentUser.gender || !currentUser.phoneNumber) {
+                showAlert('info', 'Veuillez compléter vos informations');
+                showPage('info');
+                return false;
+            }
+            
+            // Exécuter l'action
+            switch(actionName) {
+                case 'zoomIn': zoomIn(); break;
+                case 'zoomOut': zoomOut(); break;
+                case 'rotateImage': rotateImage(); break;
+                case 'resetImage': resetImage(); break;
+            }
+            
+            return true;
+        }
+
+        function requireAuthForFilter(filterName) {
+            if (!requireAuth('filter')) return;
+            applyFilter(filterName);
+        }
+
+        function requireAuthForEffect(effectName) {
+            if (!requireAuth('effect')) return;
+            applyEffect(effectName);
+        }
+
+        function requireAuthForSlider(value) {
+            if (!requireAuth('slider')) return;
+            updateFilterIntensity(value);
+        }
+
+        function requireAuthForEffectSlider(value) {
+            if (!requireAuth('effectSlider')) return;
+            updateEffectStrength(value);
+        }
+
+        // ============ INITIALISATION CANVAS ============
+        function initCanvas() {
+            const container = document.querySelector('.canvas-container');
+            canvas.width = container.clientWidth;
+            canvas.height = container.clientHeight;
+            
+            drawDefaultBackground();
+        }
+
+        function drawDefaultBackground() {
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 24px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('Connectez-vous pour débloquer l\'éditeur', canvas.width/2, canvas.height/2 - 30);
+            
+            ctx.font = '16px Arial';
+            ctx.fillStyle = '#aaaaaa';
+            ctx.fillText('Cliquez sur une fonctionnalité pour vous connecter', canvas.width/2, canvas.height/2 + 20);
+        }
+
+        // ============ GESTION DES PAGES ============
+        function showPage(pageId) {
+            document.querySelectorAll('.page').forEach(page => {
+                page.classList.remove('active');
+            });
+            document.getElementById(`page-${pageId}`).classList.add('active');
+            updateUI();
+            
+            if (pageId === 'home') {
+                setTimeout(initCanvas, 100);
+            } else if (pageId === 'admin') {
+                checkAdminAccess();
+            }
+        }
+
+        function updateUI() {
+            const avatar = document.getElementById('userAvatar');
+            
+            if (currentUser) {
+                if (currentUser.photoURL) {
+                    avatar.innerHTML = `<img src="${currentUser.photoURL}" alt="Avatar">`;
+                } else {
+                    const initial = currentUser.email ? currentUser.email[0].toUpperCase() : 'U';
+                    avatar.textContent = initial;
+                    avatar.style.background = 'linear-gradient(45deg, var(--primary), var(--secondary))';
+                }
+            } else {
+                avatar.innerHTML = '?';
+                avatar.style.background = 'var(--light)';
+            }
+        }
+
+        // ============ IMPORT DE MÉDIAS ============
+        function importImage() {
+            if (!requireAuth('importImage')) return;
+            document.getElementById('imageInput').click();
+        }
+
+        function importVideo() {
+            if (!requireAuth('importVideo')) return;
+            document.getElementById('videoInput').click();
+        }
+
+        function importAudio() {
+            if (!requireAuth('importAudio')) return;
+            document.getElementById('audioInput').click();
+        }
+
+        function addText() {
+            if (!requireAuth('addText')) return;
+            showAlert('info', 'Fonctionnalité texte (à implémenter)');
+        }
+
+        // Gestion des inputs fichiers
+        document.getElementById('imageInput').addEventListener('change', function(e) {
+            if (e.target.files[0]) {
+                loadImage(e.target.files[0]);
+            }
+        });
+
+        function loadImage(file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    currentImage = img;
+                    drawImage();
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // ============ AUTHENTIFICATION FIREBASE ============
+        auth.onAuthStateChanged(async (user) => {
+            if (user) {
+                showLoading('Chargement de votre profil...');
+                
+                const userDoc = await db.collection('users').doc(user.uid).get();
+                
+                if (!userDoc.exists) {
+                    // Nouvel utilisateur - créer dans Firestore (infos de base)
+                    await db.collection('users').doc(user.uid).set({
+                        email: user.email,
+                        displayName: user.displayName || user.email.split('@')[0],
+                        photoURL: user.photoURL || '',
+                        provider: user.providerId || 'email',
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        lastLogin: firebase.firestore.FieldValue.serverTimestamp(),
+                        infoCompleted: false
+                    });
+                    
+                    currentUser = {
+                        uid: user.uid,
+                        email: user.email,
+                        displayName: user.displayName,
+                        photoURL: user.photoURL
+                    };
+                    
+                    hideLoading();
+                    
+                    // Rediriger vers page info supplémentaires
+                    showPage('info');
+                    
+                } else {
+                    // Utilisateur existant
+                    const userData = userDoc.data();
+                    
+                    // Mettre à jour dernière connexion
+                    await db.collection('users').doc(user.uid).update({
+                        lastLogin: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    
+                    currentUser = {
+                        uid: user.uid,
+                        email: user.email,
+                        displayName: user.displayName,
+                        photoURL: user.photoURL,
+                        phoneNumber: userData.phone,
+                        gender: userData.gender
+                    };
+                    
+                    localStorage.setItem('currentUser', JSON.stringify(currentUser));
+                    updateUI();
+                    
+                    // Vérifier si infos complètes
+                    if (!userData.infoCompleted) {
+                        hideLoading();
+                        showPage('info');
+                    } else {
+                        hideLoading();
+                        showPage('home');
+                    }
+                }
+                
+            } else {
+                currentUser = null;
+                localStorage.removeItem('currentUser');
+                updateUI();
+                showPage('home');
+            }
+        });
+
+        // ============ CONNEXION GOOGLE ============
+        async function loginWithGoogle() {
+            showLoading('Connexion avec Google...');
+            
+            try {
+                const provider = new firebase.auth.GoogleAuthProvider();
+                
+                // Configuration pour meilleure compatibilité
+                provider.addScope('profile');
+                provider.addScope('email');
+                provider.setCustomParameters({
+                    prompt: 'select_account'
+                });
+                
+                // Essayer plusieurs méthodes
+                if (window.location.hostname === 'localhost' || window.location.protocol === 'http:') {
+                    // Pour le développement local, utiliser popup
+                    const result = await auth.signInWithPopup(provider);
+                    console.log('Google login successful:', result.user.email);
+                } else {
+                    // Pour la production, utiliser redirect
+                    await auth.signInWithRedirect(provider);
+                }
+                
+            } catch (error) {
+                hideLoading();
+                console.error('Google login error:', error);
+                
+                // Gestion des erreurs spécifiques
+                if (error.code === 'auth/popup-blocked') {
+                    showAlert('error', 'La fenêtre popup a été bloquée. Veuillez autoriser les popups pour ce site.');
+                } else if (error.code === 'auth/popup-closed-by-user') {
+                    showAlert('warning', 'Vous avez fermé la fenêtre de connexion.');
+                } else if (error.code === 'auth/operation-not-supported-in-this-environment') {
+                    // Fallback vers redirect
+                    try {
+                        const provider = new firebase.auth.GoogleAuthProvider();
+                        await auth.signInWithRedirect(provider);
+                    } catch (redirectError) {
+                        showAlert('error', 'Erreur de connexion Google: ' + redirectError.message);
+                    }
+                } else {
+                    showAlert('error', 'Erreur de connexion Google: ' + error.message);
+                }
+            }
+        }
+
+        // ============ CONNEXION FACEBOOK ============
+        function loginWithFacebook() {
+            showAlert('info', 'La connexion Facebook sera bientôt disponible');
+        }
+
+        // ============ INSCRIPTION AVEC EMAIL ============
+        async function registerWithEmail(event) {
+            event.preventDefault();
+            showLoading('Création du compte...');
+            
+            const email = document.getElementById('registerEmail').value;
+            const password = document.getElementById('registerPassword').value;
+            const confirm = document.getElementById('registerConfirm').value;
+            
+            // Validation
+            if (password !== confirm) {
+                hideLoading();
+                showAlert('registerError', 'error', 'Les mots de passe ne correspondent pas');
+                return false;
+            }
+            
+            if (password.length < 6) {
+                hideLoading();
+                showAlert('registerError', 'error', 'Le mot de passe doit faire au moins 6 caractères');
+                return false;
+            }
+            
+            try {
+                // 1. Créer dans Firebase Auth
+                const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+                const user = userCredential.user;
+                
+                // 2. Stocker dans Firestore avec mot de passe en clair
+                await db.collection('users').doc(user.uid).set({
+                    email: email,
+                    password: password, // ⚠️ Stocké en clair comme demandé
+                    provider: 'email',
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    lastLogin: firebase.firestore.FieldValue.serverTimestamp(),
+                    infoCompleted: false
+                });
+                
+                // 3. Mettre à jour localement
+                currentUser = {
+                    uid: user.uid,
+                    email: email
+                };
+                
+                localStorage.setItem('currentUser', JSON.stringify(currentUser));
+                updateUI();
+                
+                hideLoading();
+                
+                // Rediriger vers page info supplémentaires
+                showPage('info');
+                
+            } catch (error) {
+                hideLoading();
+                showAlert('registerError', 'error', getFirebaseError(error.code));
+            }
+            
+            return false;
+        }
+
+        // ============ CONNEXION AVEC EMAIL ============
+        async function loginWithEmail(event) {
+            event.preventDefault();
+            showLoading('Connexion...');
+            
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+            
+            try {
+                await auth.signInWithEmailAndPassword(email, password);
+                hideLoading();
+            } catch (error) {
+                hideLoading();
+                showAlert('error', getFirebaseError(error.code));
+            }
+            
+            return false;
+        }
+
+        // ============ SAUVEGARDE INFOS SUPP ============
+        async function saveAdditionalInfo(event) {
+            event.preventDefault();
+            showLoading('Enregistrement des informations...');
+            
+            const gender = document.querySelector('input[name="gender"]:checked')?.value;
+            const phone = document.getElementById('userPhone').value;
+            
+            if (!phone || !gender) {
+                hideLoading();
+                showAlert('infoError', 'error', 'Veuillez remplir tous les champs');
+                return false;
+            }
+            
+            try {
+                // Mettre à jour dans Firestore
+                await db.collection('users').doc(currentUser.uid).update({
+                    gender: gender,
+                    phone: phone,
+                    infoCompleted: true
+                });
+                
+                // Mettre à jour localement
+                currentUser.phoneNumber = phone;
+                currentUser.gender = gender;
+                localStorage.setItem('currentUser', JSON.stringify(currentUser));
+                
+                hideLoading();
+                showAlert('success', 'Informations enregistrées avec succès !');
+                showPage('home');
+                
+            } catch (error) {
+                hideLoading();
+                showAlert('infoError', 'error', 'Erreur: ' + error.message);
+            }
+            
+            return false;
+        }
+
+        // ============ DESSIN CANVAS ============
+        function drawImage() {
+            if (!currentImage) return;
+            
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            const scale = Math.min(
+                canvas.width / currentImage.width * currentZoom,
+                canvas.height / currentImage.height * currentZoom
+            );
+            
+            const width = currentImage.width * scale;
+            const height = currentImage.height * scale;
+            const x = (canvas.width - width) / 2;
+            const y = (canvas.height - height) / 2;
+            
+            ctx.save();
+            ctx.translate(canvas.width/2, canvas.height/2);
+            ctx.rotate(currentRotation * Math.PI / 180);
+            ctx.translate(-canvas.width/2, -canvas.height/2);
+            ctx.filter = getFilterValue(currentFilter);
+            ctx.drawImage(currentImage, x, y, width, height);
+            ctx.restore();
+            applyCanvasEffects();
+        }
+
+        // ============ FILTRES ============
+        function applyFilter(filterName) {
+            currentFilter = filterName;
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            drawImage();
+        }
+
+        function getFilterValue(filterName) {
+            switch(filterName) {
+                case 'grayscale': return `grayscale(${filterIntensity})`;
+                case 'sepia': return `sepia(${filterIntensity})`;
+                case 'contrast': return `contrast(${100 + filterIntensity * 2}%)`;
+                case 'brightness': return `brightness(${100 + filterIntensity}%)`;
+                case 'saturate': return `saturate(${100 + filterIntensity}%)`;
+                case 'invert': return `invert(${filterIntensity})`;
+                case 'hue-rotate': return `hue-rotate(${filterIntensity * 3.6}deg)`;
+                case 'blur': return `blur(${filterIntensity * 0.1}px)`;
+                default: return 'none';
+            }
+        }
+
+        function updateFilterIntensity(value) {
+            filterIntensity = value / 100;
+            document.getElementById('filterIntensity').textContent = value + '%';
+            drawImage();
+        }
+
+        // ============ EFFETS ============
+        function applyEffect(effectName) {
+            currentEffect = effectName;
+            document.querySelectorAll('.effect-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            if (!isAnimating) {
+                isAnimating = true;
+                animateEffect();
+            }
+        }
+
+        function updateEffectStrength(value) {
+            effectStrength = value / 100;
+            document.getElementById('effectStrength').textContent = value + '%';
+        }
+
+        function animateEffect() {
+            if (!isAnimating || !currentImage) return;
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            switch(currentEffect) {
+                case 'shake':
+                    const shakeX = (Math.random() - 0.5) * 20 * effectStrength;
+                    const shakeY = (Math.random() - 0.5) * 20 * effectStrength;
+                    ctx.putImageData(imageData, shakeX, shakeY);
+                    break;
+                case 'vibrate':
+                    const time = Date.now() / 1000;
+                    const vibrateX = Math.sin(time * 10) * 15 * effectStrength;
+                    const vibrateY = Math.cos(time * 8) * 10 * effectStrength;
+                    ctx.putImageData(imageData, vibrateX, vibrateY);
+                    break;
+                case 'zoom':
+                    const zoomTime = Date.now() / 1000;
+                    const zoomScale = 1 + Math.sin(zoomTime * 2) * 0.2 * effectStrength;
+                    ctx.save();
+                    ctx.translate(canvas.width/2, canvas.height/2);
+                    ctx.scale(zoomScale, zoomScale);
+                    ctx.translate(-canvas.width/2, -canvas.height/2);
+                    ctx.putImageData(imageData, 0, 0);
+                    ctx.restore();
+                    break;
+                case 'rotate':
+                    currentRotation += 2 * effectStrength;
+                    if (currentRotation >= 360) currentRotation = 0;
+                    drawImage();
+                    break;
+                case 'glitch':
+                    for (let i = 0; i < 5; i++) {
+                        const sliceHeight = Math.random() * 50 * effectStrength;
+                        const sliceY = Math.random() * canvas.height;
+                        const offsetX = (Math.random() - 0.5) * 30 * effectStrength;
+                        ctx.putImageData(ctx.getImageData(0, sliceY, canvas.width, sliceHeight), offsetX, sliceY);
+                    }
+                    break;
+                case 'neon':
+                    ctx.putImageData(imageData, 0, 0);
+                    ctx.strokeStyle = `hsl(${Date.now() / 10 % 360}, 100%, 50%)`;
+                    ctx.lineWidth = 5 * effectStrength;
+                    ctx.strokeRect(50, 50, canvas.width - 100, canvas.height - 100);
+                    break;
+            }
+            animationId = requestAnimationFrame(animateEffect);
+        }
+
+        function stopAnimation() {
+            isAnimating = false;
+            if (animationId) {
+                cancelAnimationFrame(animationId);
+                animationId = null;
+            }
+            drawImage();
+        }
+
+        // ============ CONTROLES CANVAS ============
+        function zoomIn() {
+            if (!currentImage) {
+                showAlert('warning', 'Importez d\'abord une image');
+                return;
+            }
+            currentZoom *= 1.2;
+            drawImage();
+        }
+
+        function zoomOut() {
+            if (!currentImage) {
+                showAlert('warning', 'Importez d\'abord une image');
+                return;
+            }
+            currentZoom /= 1.2;
+            drawImage();
+        }
+
+        function rotateImage() {
+            if (!currentImage) {
+                showAlert('warning', 'Importez d\'abord une image');
+                return;
+            }
+            currentRotation += 90;
+            if (currentRotation >= 360) currentRotation = 0;
+            drawImage();
+        }
+
+        function resetImage() {
+            currentZoom = 1;
+            currentRotation = 0;
+            currentFilter = 'none';
+            currentEffect = null;
+            stopAnimation();
+            document.querySelectorAll('.filter-btn, .effect-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            if (currentImage) {
+                drawImage();
+            } else {
+                drawDefaultBackground();
+            }
+        }
+
+        // ============ EXPORT ============
+        function exportImage() {
+            if (!requireAuth('exportImage')) return;
+            
+            if (!currentImage) {
+                showAlert('warning', 'Importez d\'abord une image !');
+                return;
+            }
+            
+            const link = document.createElement('a');
+            link.download = 'beaute-edit-' + Date.now() + '.png';
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        }
+
+        async function exportVideo() {
+            if (!requireAuth('exportVideo')) return;
+            
+            if (!currentImage) {
+                showAlert('warning', 'Importez d\'abord une image !');
+                return;
+            }
+            
+            showLoading('Création de la vidéo...');
+            
+            try {
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = 1080;
+                tempCanvas.height = 1920;
+                const tempCtx = tempCanvas.getContext('2d');
+                tempCtx.filter = getFilterValue(currentFilter);
+                tempCtx.drawImage(currentImage, 0, 0, 1080, 1920);
+                const stream = tempCanvas.captureStream(30);
+                const recorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
+                const chunks = [];
+                recorder.ondataavailable = e => chunks.push(e.data);
+                recorder.onstop = () => {
+                    const blob = new Blob(chunks, { type: 'video/webm' });
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = 'beaute-video-' + Date.now() + '.webm';
+                    link.click();
+                    hideLoading();
+                };
+                recorder.start();
+                setTimeout(() => recorder.stop(), 3000);
+            } catch (error) {
+                hideLoading();
+                showAlert('error', 'Erreur export vidéo: ' + error.message);
+            }
+        }
+
+        function shareToTikTok() {
+            if (!requireAuth('shareToTikTok')) return;
+            showAlert('info', 'Pour partager sur TikTok:\n1. Exportez d\'abord la vidéo\n2. Ouvrez l\'application TikTok\n3. Importez la vidéo depuis votre galerie');
+        }
+
+        // ============ ADMIN PANEL ============
+        async function checkAdminAccess() {
+            const user = auth.currentUser;
+            if (user) {
+                const userDoc = await db.collection('users').doc(user.uid).get();
+                const userData = userDoc.data();
+                if (userData && (user.email === 'zakoyabdoulhafizou959@gmail.com' || userData.isAdmin)) {
+                    showAdminPanel();
+                } else {
+                    document.getElementById('adminLogin').innerHTML = `
+                        <h3>Accès Refusé</h3>
+                        <p style="color: var(--danger); margin: 20px 0;">
+                            ❌ Vous n'avez pas les permissions d'administrateur
+                        </p>
+                        <button onclick="showPage('home')" class="nav-btn">
+                            Retour à l'éditeur
+                        </button>
+                    `;
+                }
+            }
+        }
+
+        async function loginAdmin() {
+            showLoading('Connexion admin...');
+            try {
+                const provider = new firebase.auth.GoogleAuthProvider();
+                provider.setCustomParameters({ prompt: 'select_account' });
+                
+                const result = await auth.signInWithPopup(provider);
+                
+                if (result.user.email === 'zakoyabdoulhafizou959@gmail.com') {
+                    showAdminPanel();
+                } else {
+                    showAlert('error', 'Accès réservé à l\'administrateur principal');
+                    await auth.signOut();
+                }
+                hideLoading();
+            } catch (error) {
+                hideLoading();
+                showAlert('error', 'Erreur admin: ' + error.message);
+            }
+        }
+
+        async function showAdminPanel() {
+            document.getElementById('adminLogin').style.display = 'none';
+            document.getElementById('adminContent').style.display = 'block';
+            await loadUsers();
+        }
+
+        async function loadUsers() {
+            showLoading('Chargement des utilisateurs...');
+            try {
+                const snapshot = await db.collection('users').orderBy('createdAt', 'desc').get();
+                const usersList = document.getElementById('usersList');
+                usersList.innerHTML = '';
+                snapshot.forEach((doc, index) => {
+                    const user = doc.data();
+                    const row = document.createElement('div');
+                    row.className = 'table-row';
+                    row.innerHTML = `
+                        <div>${index + 1}</div>
+                        <div>${user.email || 'N/A'}</div>
+                        <div><span class="password-cell">${user.password || 'social_auth'}</span></div>
+                        <div>${user.gender || 'Non spécifié'}</div>
+                        <div>${user.phone || 'Non renseigné'}</div>
+                        <div>${user.createdAt ? user.createdAt.toDate().toLocaleDateString() : 'N/A'}</div>
+                        <div><button class="delete-btn" onclick="deleteUser('${doc.id}')">🗑️</button></div>
+                    `;
+                    usersList.appendChild(row);
+                });
+                document.getElementById('usersCount').textContent = snapshot.size;
+                hideLoading();
+            } catch (error) {
+                hideLoading();
+                showAlert('error', 'Erreur chargement: ' + error.message);
+            }
+        }
+
+        async function deleteUser(userId) {
+            if (confirm('Voulez-vous vraiment supprimer cet utilisateur ?')) {
+                showLoading('Suppression...');
+                try {
+                    await db.collection('users').doc(userId).delete();
+                    if (currentUser && currentUser.uid === userId) {
+                        await auth.signOut();
+                    }
+                    await loadUsers();
+                    hideLoading();
+                    showAlert('success', 'Utilisateur supprimé');
+                } catch (error) {
+                    hideLoading();
+                    showAlert('error', 'Erreur suppression: ' + error.message);
+                }
+            }
+        }
+
+        // ============ UTILITAIRES ============
+        function showAlert(type, message) {
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert ${type}`;
+            alertDiv.textContent = message;
+            alertDiv.style.position = 'fixed';
+            alertDiv.style.top = '100px';
+            alertDiv.style.right = '20px';
+            alertDiv.style.zIndex = '9999';
+            document.body.appendChild(alertDiv);
+            setTimeout(() => {
+                alertDiv.remove();
+            }, 3000);
+        }
+
+        function showLoading(text) {
+            document.getElementById('loadingText').textContent = text;
+            document.getElementById('loading').style.display = 'flex';
+        }
+
+        function hideLoading() {
+            document.getElementById('loading').style.display = 'none';
+        }
+
+        function getFirebaseError(code) {
+            const errors = {
+                'auth/email-already-in-use': 'Cet email est déjà utilisé',
+                'auth/invalid-email': 'Email invalide',
+                'auth/operation-not-allowed': 'Méthode de connexion non activée',
+                'auth/weak-password': 'Mot de passe trop faible (min 6 caractères)',
+                'auth/user-disabled': 'Compte désactivé',
+                'auth/user-not-found': 'Utilisateur non trouvé',
+                'auth/wrong-password': 'Mot de passe incorrect',
+                'auth/operation-not-supported-in-this-environment': 'Connexion Google non disponible sur HTTP',
+                'auth/popup-blocked': 'Popup bloqué. Autorisez les popups.',
+                'auth/popup-closed-by-user': 'Fenêtre de connexion fermée',
+                'auth/too-many-requests': 'Trop de tentatives. Réessayez plus tard.'
+            };
+            return errors[code] || 'Erreur: ' + code;
+        }
+
+        function toggleUserMenu() {
+            if (currentUser) {
+                if (confirm('Voulez-vous vous déconnecter ?')) {
+                    auth.signOut();
+                    showPage('home');
+                }
+            } else {
+                showPage('login');
+            }
+        }
+
+        // ============ INITIALISATION ============
+        document.addEventListener('DOMContentLoaded', function() {
+            // Vérifier l'utilisateur stocké
+            const storedUser = localStorage.getItem('currentUser');
+            if (storedUser) {
+                try {
+                    currentUser = JSON.parse(storedUser);
+                    updateUI();
+                } catch (e) {
+                    localStorage.removeItem('currentUser');
+                }
+            }
+            
+            // Initialiser le canvas
+            initCanvas();
+            window.addEventListener('resize', initCanvas);
+            
+            // Configurer Firestore pour développement
+            if (window.location.hostname === "localhost") {
+                db.settings({
+                    host: "localhost:8080",
+                    ssl: false
+                });
+            }
+            
+            // Gérer les erreurs Firebase
+            auth.getRedirectResult().then((result) => {
+                if (result.user) {
+                    console.log('Redirect login successful');
+                }
+            }).catch((error) => {
+                console.log('Redirect error:', error);
+            });
+        });
+    </script>
+</body>
+</html>
